@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAP Controls Mastery — Console</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="content-parser.js"></script>
+<style>
+  :root {
+    --navy: #1F3864;
+    --teal: #1F7A8C;
+    --amber: #C65911;
+    --lightgrey: #F2F2F2;
+    --midgrey: #D9D9D9;
+    --dark: #222222;
+    --green: #2E7D32;
+    --red: #B02418;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Calibri, Roboto, sans-serif;
+    background: #F7F9FB;
+    color: var(--dark);
+  }
+  /* ---------- Sign-in screen ---------- */
+  #signin-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .signin-card {
+    max-width: 420px;
+    width: 100%;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(31,56,100,0.10);
+    overflow: hidden;
+  }
+  .signin-banner {
+    background: var(--navy);
+    padding: 24px 32px;
+  }
+  .signin-banner .brand { color: #fff; font-weight: 700; font-size: 14px; letter-spacing: 0.5px; }
+  .signin-banner .tagline { color: #D9E4EF; font-size: 12px; margin-top: 4px; }
+  .signin-body { padding: 32px; }
+  .signin-body h1 { color: var(--navy); font-size: 22px; margin-bottom: 6px; }
+  .signin-body .sub { color: #666; font-size: 14px; margin-bottom: 22px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 5px; }
+  .field input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--midgrey);
+    border-radius: 6px; font-size: 14px;
+  }
+  .field input:focus { outline: none; border-color: var(--teal); }
+  .btn-primary {
+    width: 100%; padding: 11px; background: var(--navy); color: #fff;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-top: 6px;
+  }
+  .btn-primary:hover { background: #16294a; }
+  .btn-primary:disabled { background: #9aa5b8; cursor: not-allowed; }
+  .error-msg { color: var(--red); font-size: 13px; margin-top: 10px; }
+  .not-enrolled { color: var(--red); font-size: 13px; margin-top: 14px; line-height: 1.5; }
+  .signin-footer { margin-top: 20px; font-size: 12px; color: #999; text-align: center; }
+
+  /* ---------- Console layout ---------- */
+  #console-screen { display: none; height: 100vh; }
+  .app { display: flex; height: 100vh; }
+  .sidebar {
+    width: 300px; background: var(--navy); color: #fff; overflow-y: auto;
+    flex-shrink: 0; display: flex; flex-direction: column;
+  }
+  .sidebar-header { padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.15); }
+  .sidebar-header .brand { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+  .sidebar-header .product { font-size: 15px; color: var(--amber); font-weight: 700; margin-top: 4px; }
+  .sidebar-nav { flex: 1; overflow-y: auto; padding: 10px 0; }
+  .phase-block { margin-bottom: 4px; }
+  .phase-title {
+    padding: 10px 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    color: #D9E4EF; text-transform: uppercase; cursor: pointer; user-select: none;
+  }
+  .week-title {
+    padding: 6px 20px 6px 28px; font-size: 12px; color: #B7C4DA; font-weight: 600;
+  }
+  .day-item {
+    padding: 6px 20px 6px 36px; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; color: #E5EBF3;
+  }
+  .day-item:hover { background: rgba(255,255,255,0.08); }
+  .day-item.active { background: var(--teal); color: #fff; }
+  .day-check { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid #7C8CA8; flex-shrink: 0; }
+  .day-check.done { background: var(--amber); border-color: var(--amber); }
+  .sidebar-section-nav { padding: 10px 20px; border-top: 1px solid rgba(255,255,255,0.15); }
+  .sidebar-section-nav .stab {
+    padding: 8px 0; font-size: 13px; cursor: pointer; color: #D9E4EF;
+  }
+  .sidebar-section-nav .stab:hover { color: #fff; }
+  .sidebar-footer { padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.15); font-size: 12px; }
+  .sidebar-footer button {
+    background: transparent; border: 1px solid #7C8CA8; color: #D9E4EF;
+    padding: 6px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; width: 100%;
+  }
+  .sidebar-footer button:hover { border-color: #fff; color: #fff; }
+
+  .main { flex: 1; overflow-y: auto; padding: 40px 56px; max-width: 900px; }
+  .day-header { margin-bottom: 18px; }
+  .day-header .phase-week { color: var(--teal); font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .day-header h1 { color: var(--navy); font-size: 26px; line-height: 1.3; }
+  .content-body p { margin-bottom: 14px; line-height: 1.65; font-size: 15px; }
+  .content-body table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 14px; }
+  .content-body table th { background: var(--navy); color: #fff; text-align: left; padding: 9px 11px; font-weight: 600; }
+  .content-body table td { padding: 9px 11px; border-bottom: 1px solid var(--midgrey); vertical-align: top; }
+  .content-body table tr:nth-child(even) td { background: var(--lightgrey); }
+  .content-body ul { margin: 0 0 14px 22px; }
+  .content-body li { margin-bottom: 6px; font-size: 15px; line-height: 1.5; }
+  .callout {
+    background: var(--lightgrey); border-left: 4px solid var(--teal);
+    padding: 12px 16px; margin-bottom: 16px; font-style: italic; font-size: 14px;
+  }
+  .case-title {
+    border-left: 4px solid var(--amber); padding-left: 10px; margin: 18px 0 8px;
+    font-weight: 700; color: var(--amber); font-size: 13px; letter-spacing: 0.3px; text-transform: uppercase;
+  }
+  .exit-standard {
+    background: #EFF7F8; border-left: 4px solid var(--teal); padding: 14px 16px;
+    margin-top: 22px; border-radius: 4px;
+  }
+  .exit-standard .label { font-weight: 700; color: var(--teal); font-size: 12px; letter-spacing: 0.5px; margin-bottom: 5px; }
+  .mark-complete-row { margin-top: 24px; display: flex; align-items: center; gap: 12px; }
+  .mark-complete-row button {
+    background: var(--amber); color: #fff; border: none; padding: 10px 20px;
+    border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .mark-complete-row button:hover { background: #a94c0e; }
+  .mark-complete-row button.done { background: var(--green); }
+  .mark-complete-row .status { font-size: 13px; color: #666; }
+
+  .list-item {
+    padding: 14px 16px; border: 1px solid var(--midgrey); border-radius: 6px;
+    margin-bottom: 10px; cursor: pointer; background: #fff;
+  }
+  .list-item:hover { border-color: var(--teal); }
+  .list-item .li-title { font-weight: 700; color: var(--navy); font-size: 14px; }
+  .list-item .li-sub { font-size: 12px; color: #777; margin-top: 3px; }
+
+  .loading, .empty-state { padding: 60px 0; text-align: center; color: #999; }
+
+  .handson-box {
+    margin-top: 26px; background: #FFF8EF; border: 1px solid #EAD3AE; border-left: 4px solid var(--amber);
+    border-radius: 6px; padding: 16px 18px;
+  }
+  .handson-box .handson-label {
+    font-weight: 700; color: var(--amber); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px;
+  }
+  .handson-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #F0E1C8; }
+  .handson-item:first-of-type { border-top: none; }
+  .handson-item .handson-text { font-size: 13px; color: #444; }
+  .handson-item .handson-text b { color: var(--navy); }
+  .handson-btn {
+    flex-shrink: 0; background: var(--navy); color: #fff; border: none; padding: 6px 13px; border-radius: 5px;
+    font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .handson-btn:hover { background: #16294a; }
+
+  .howto-page .flow-row { display: flex; align-items: stretch; gap: 0; margin: 22px 0 8px; flex-wrap: wrap; }
+  .howto-page .flow-card {
+    flex: 1; min-width: 180px; background: #fff; border: 1px solid var(--midgrey); border-radius: 8px;
+    padding: 16px; position: relative;
+  }
+  .howto-page .flow-card .fc-num { font-size: 11px; font-weight: 700; color: var(--teal); letter-spacing: 0.5px; text-transform: uppercase; }
+  .howto-page .flow-card h3 { font-size: 15px; color: var(--navy); margin: 4px 0 8px; }
+  .howto-page .flow-card p { font-size: 13px; color: #555; line-height: 1.5; }
+  .howto-page .flow-arrow { display: flex; align-items: center; justify-content: center; padding: 0 6px; font-size: 20px; color: var(--midgrey); }
+  .howto-page .rule-list { margin: 20px 0; padding: 0; list-style: none; }
+  .howto-page .rule-list li { padding: 10px 0 10px 28px; border-top: 1px solid var(--midgrey); font-size: 14px; line-height: 1.5; position: relative; }
+  .howto-page .rule-list li:first-child { border-top: none; }
+  .howto-page .rule-list li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- ============ SIGN-IN SCREEN ============ -->
+<div id="signin-screen">
+  <div class="signin-card">
+    <div class="signin-banner">
+      <div class="brand">TIB SYSTEMS LLC</div>
+      <div class="tagline">SAP Controls &amp; Compliance — Talent Development Programme</div>
+    </div>
+    <div class="signin-body">
+      <h1>SAP Controls Mastery</h1>
+      <div class="sub">Sign in to your programme console.</div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="email-input" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="password-input" autocomplete="current-password" />
+      </div>
+      <button class="btn-primary" id="signin-btn">Sign In</button>
+      <div style="text-align:center; margin-top:12px;">
+        <a href="#" id="forgot-password-link" style="font-size:13px; color:var(--teal); text-decoration:none;">Forgot your password?</a>
+      </div>
+      <div id="signin-error" class="error-msg" style="display:none;"></div>
+      <div id="forgot-password-msg" class="error-msg" style="display:none; color:var(--teal);"></div>
+      <div id="not-enrolled" class="not-enrolled" style="display:none;">
+        We couldn't find an active enrolment for this account. If you've just enrolled, this can take a few minutes to activate — otherwise contact academy@tib-systems.com.
+      </div>
+      <div class="signin-footer">Standalone self-study programme — independent of the TIB Job Role subscription catalog.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SET NEW PASSWORD SCREEN (password recovery landing) ============ -->
+<div id="setpw-screen" style="display:none;">
+  <div class="signin-card" style="margin:0 auto; margin-top:15vh;">
+    <div class="signin-banner">
+      <div class="brand">TIB SYSTEMS LLC</div>
+      <div class="tagline">SAP Controls &amp; Compliance — Talent Development Programme</div>
+    </div>
+    <div class="signin-body">
+      <h1>Set a new password</h1>
+      <div class="sub">Choose a new password for your account.</div>
+      <div class="field">
+        <label>New password</label>
+        <input type="password" id="new-password-input" autocomplete="new-password" />
+      </div>
+      <div class="field">
+        <label>Confirm new password</label>
+        <input type="password" id="confirm-password-input" autocomplete="new-password" />
+      </div>
+      <button class="btn-primary" id="setpw-btn">Set Password</button>
+      <div id="setpw-error" class="error-msg" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CONSOLE SCREEN ============ -->
+<div id="console-screen">
+  <div class="app">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">TIB SYSTEMS LLC</div>
+        <div class="product">SAP Controls Mastery</div>
+      </div>
+      <a href="https://sap-controls-analyst-lms.vercel.app" target="_blank" rel="noopener"
+         style="display:block; margin:10px 14px; padding:10px 12px; background:var(--amber); color:#fff;
+           border-radius:6px; text-decoration:none; font-size:12px; font-weight:700; text-align:center;">
+        🎯 No-Access Track (judgment primer) →
+      </a>
+      <div class="sidebar-nav" id="sidebar-nav">
+        <div class="loading">Loading curriculum…</div>
+      </div>
+      <div class="sidebar-section-nav">
+        <div class="stab" data-section="labs">🧪 Live SAP Labs</div>
+        <div class="stab" data-section="templates">📋 Templates</div>
+        <div class="stab" data-section="case_studies">📚 Case Studies</div>
+        <div class="stab" data-section="interview_rounds">🎤 Interview Simulation</div>
+        <div class="stab" data-section="materials">📁 Course Materials</div>
+        <div class="stab" data-section="howto">ℹ️ How This Course Works</div>
+      </div>
+      <div class="sidebar-footer">
+        <div id="track-toggle-row" style="margin-bottom:10px;"></div>
+        <div id="user-email" style="margin-bottom:8px; color:#B7C4DA;"></div>
+        <button id="signout-btn">Sign Out</button>
+      </div>
+    </div>
+    <div class="main" id="main-content">
+      <div class="empty-state">Select a day from the sidebar to begin.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://blfgwysgekfqhcafofhe.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsZmd3eXNnZWtmcWhjYWZvZmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyODY0NDksImV4cCI6MjA5NTg2MjQ0OX0.HPdIMd-X30QBufoL9BVSVte6s_Fc-OOKIq9MbwLrzcI";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let allDays = [];
+let completedDayNumbers = new Set();
+let currentUserEmail = null;
+let currentDayNumber = null;
+let currentTrack = 'standard'; // 'standard' or 'fast' — chosen by the trainee, stored on their enrollment
+let contentCache = { labs: null, templates: null, case_studies: null, interview_rounds: null };
+
+let allLabs = [];
+let labsByDay = {};
+
+// Confident lab -> template correspondences (only where a lab's deliverable IS one of the
+// 16 workpaper templates in Manual 3 — system-execution labs with no matching template are
+// intentionally left unmapped rather than forced).
+const LAB_TO_TEMPLATE = {
+  'LAB-01': 'TPL-03', 'LAB-05': 'TPL-03',   // Walkthrough Documentation Template
+  'LAB-04': 'TPL-02',                        // SoD Conflict Matrix
+  'LAB-06': 'TPL-10',                        // Deficiency Memo Template
+  'LAB-07': 'TPL-01',                        // Risk & Control Matrix (RCM)
+  'LAB-08': 'TPL-06',                        // Sampling Worksheet
+  'LAB-09': 'TPL-07',                        // SGR Reliance Testing Template
+};
+const TEMPLATE_NAMES = {
+  'TPL-01': 'Risk & Control Matrix (RCM)', 'TPL-02': 'SoD Conflict Matrix',
+  'TPL-03': 'Walkthrough Documentation Template', 'TPL-06': 'Sampling Worksheet',
+  'TPL-07': 'SGR Reliance Testing Template', 'TPL-10': 'Deficiency Memo Template',
+};
+
+const B2_BASE = 'https://f005.backblazeb2.com/file/kabo-training-docs/course-materials';
+const COURSE_MATERIALS = [
+  { file: `${B2_BASE}/M01-TIB-TRN-SC-101-Core-Curriculum.pdf`, title: 'Manual 1 — Core Curriculum (AC Edition, 122-Day)', desc: 'TIB-TRN-SC-101 · original PDF, unmodified' },
+  { file: `${B2_BASE}/M02-TIB-TRN-SC-102-Live-SAP-Lab-Workbook.pdf`, title: 'Manual 2 — Live SAP Lab Workbook (with screenshots)', desc: 'TIB-TRN-SC-102 · original PDF, unmodified' },
+  { file: `${B2_BASE}/M03-TIB-TRN-SC-103-Reference-and-Templates.pdf`, title: 'Manual 3 — Reference and Templates', desc: 'TIB-TRN-SC-103 · original PDF, unmodified' },
+  { file: `${B2_BASE}/M04-SAP-GRC-Mastery-Program-Manual-1.pdf`, title: 'SAP GRC Mastery Program — Manual 1 (with screenshots)', desc: 'Original PDF, unmodified' },
+  { file: `${B2_BASE}/M05-SOX-ITGC-Case-Study-Workbook.pdf`, title: 'SOX/ITGC Manual 3 — Case Study Workbook', desc: 'Original PDF, unmodified' },
+  { file: `${B2_BASE}/M06-DEFERRED-Advance-Study-Supplement.docx`, title: 'Deferred Advance Study Supplement', desc: 'Optional advanced reading beyond the core curriculum, for learners continuing toward the Senior Track', badge: 'DEFERRED — ADVANCED' },
+];
+
+// ---------------- Auth ----------------
+
+document.getElementById('signin-btn').addEventListener('click', signIn);
+document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+
+document.getElementById('forgot-password-link').addEventListener('click', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email-input').value.trim();
+  const msgEl = document.getElementById('forgot-password-msg');
+  const errEl = document.getElementById('signin-error');
+  errEl.style.display = 'none';
+
+  if (!email) {
+    msgEl.style.color = 'var(--red)';
+    msgEl.textContent = 'Enter your email above first, then click "Forgot your password?" again.';
+    msgEl.style.display = 'block';
+    return;
+  }
+
+  const link = document.getElementById('forgot-password-link');
+  link.textContent = 'Sending…';
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+  link.textContent = 'Forgot your password?';
+
+  msgEl.style.color = 'var(--teal)';
+  msgEl.textContent = 'If that email has an account, a password reset link is on its way. Check your inbox.';
+  msgEl.style.display = 'block';
+});
+
+async function signIn() {
+  const email = document.getElementById('email-input').value.trim();
+  const password = document.getElementById('password-input').value;
+  const errEl = document.getElementById('signin-error');
+  const notEnrolledEl = document.getElementById('not-enrolled');
+  errEl.style.display = 'none';
+  notEnrolledEl.style.display = 'none';
+
+  if (!email || !password) {
+    errEl.textContent = 'Enter your email and password.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('signin-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Sign In';
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const { data: enrollment, error: enrollErr } = await sb
+    .from('selfstudy_enrollments')
+    .select('email, tier, preferred_track')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (enrollErr || !enrollment) {
+    notEnrolledEl.style.display = 'block';
+    await sb.auth.signOut();
+    return;
+  }
+
+  currentUserEmail = email;
+  currentTrack = enrollment.preferred_track || 'standard';
+  enterConsole();
+}
+
+document.getElementById('signout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  location.reload();
+});
+
+let passwordRecoveryActive = false;
+
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    passwordRecoveryActive = true;
+    document.getElementById('signin-screen').style.display = 'none';
+    document.getElementById('console-screen').style.display = 'none';
+    document.getElementById('setpw-screen').style.display = 'block';
+  }
+});
+
+document.getElementById('setpw-btn').addEventListener('click', async () => {
+  const pw1 = document.getElementById('new-password-input').value;
+  const pw2 = document.getElementById('confirm-password-input').value;
+  const errEl = document.getElementById('setpw-error');
+  errEl.style.display = 'none';
+
+  if (!pw1 || pw1.length < 8) {
+    errEl.textContent = 'Password must be at least 8 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (pw1 !== pw2) {
+    errEl.textContent = 'Passwords do not match.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('setpw-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const { error } = await sb.auth.updateUser({ password: pw1 });
+  btn.disabled = false; btn.textContent = 'Set Password';
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  await sb.auth.signOut();
+  document.getElementById('setpw-screen').style.display = 'none';
+  document.getElementById('signin-screen').style.display = 'block';
+  const notice = document.getElementById('forgot-password-msg');
+  notice.style.color = 'var(--teal)';
+  notice.textContent = 'Password updated — sign in with your new password.';
+  notice.style.display = 'block';
+});
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (passwordRecoveryActive) return;
+  if (session) {
+    const email = session.user.email;
+    const { data: enrollment } = await sb
+      .from('selfstudy_enrollments')
+      .select('email, preferred_track')
+      .eq('email', email)
+      .maybeSingle();
+    if (enrollment) {
+      currentUserEmail = email;
+      currentTrack = enrollment.preferred_track || 'standard';
+      enterConsole();
+    }
+  }
+})();
+
+function renderTrackToggle() {
+  const coreCount = allDays.filter(d => d.track === 'core').length;
+  const fullCount = allDays.length;
+  const el = document.getElementById('track-toggle-row');
+  el.innerHTML = `
+    <div style="font-size:11px; color:#B7C4DA; margin-bottom:5px; letter-spacing:0.3px;">PROGRAMME TRACK</div>
+    <div style="display:flex; gap:6px;">
+      <button id="track-fast-btn" style="flex:1; padding:6px 4px; font-size:11px; font-weight:700; border-radius:5px; cursor:pointer;
+        border:1px solid ${currentTrack==='fast' ? 'var(--amber)' : '#7C8CA8'};
+        background:${currentTrack==='fast' ? 'var(--amber)' : 'transparent'}; color:#fff;">
+        ⚡ Fast (${coreCount})
+      </button>
+      <button id="track-standard-btn" style="flex:1; padding:6px 4px; font-size:11px; font-weight:700; border-radius:5px; cursor:pointer;
+        border:1px solid ${currentTrack==='standard' ? 'var(--teal)' : '#7C8CA8'};
+        background:${currentTrack==='standard' ? 'var(--teal)' : 'transparent'}; color:#fff;">
+        📚 Standard (${fullCount})
+      </button>
+    </div>`;
+  document.getElementById('track-fast-btn').addEventListener('click', () => setTrack('fast'));
+  document.getElementById('track-standard-btn').addEventListener('click', () => setTrack('standard'));
+}
+
+async function setTrack(track) {
+  if (track === currentTrack) return;
+  currentTrack = track;
+  renderTrackToggle();
+  renderSidebar();
+  await sb.from('selfstudy_enrollments').update({ preferred_track: track }).eq('email', currentUserEmail);
+}
+
+async function enterConsole() {
+  document.getElementById('signin-screen').style.display = 'none';
+  document.getElementById('console-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = currentUserEmail;
+
+  document.querySelectorAll('.stab').forEach(tab => {
+    tab.addEventListener('click', () => showSection(tab.dataset.section));
+  });
+
+  await loadDays();
+  await loadLabs();
+  await loadProgress();
+  renderTrackToggle();
+  renderSidebar();
+
+  if (allDays.length > 0) {
+    selectDay(allDays[0].day_number);
+  }
+}
+
+async function loadDays() {
+  const { data, error } = await sb
+    .from('selfstudy_days')
+    .select('day_number, session_number, spans_label, track, phase, week_number, title, body_markdown, exit_standard, lab_ref, template_ref')
+    .order('session_number', { ascending: true });
+  if (error) {
+    document.getElementById('sidebar-nav').innerHTML = `<div class="loading">Error loading curriculum: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  allDays = data || [];
+}
+
+async function loadLabs() {
+  const { data, error } = await sb
+    .from('selfstudy_labs')
+    .select('lab_id, day_ref, title, objective')
+    .order('lab_id', { ascending: true });
+  if (error) { allLabs = []; labsByDay = {}; return; }
+  allLabs = data || [];
+  labsByDay = {};
+  allLabs.forEach(lab => {
+    if (lab.day_ref == null) return;
+    (labsByDay[lab.day_ref] = labsByDay[lab.day_ref] || []).push(lab);
+  });
+}
+
+async function loadProgress() {
+  const { data } = await sb
+    .from('selfstudy_progress')
+    .select('day_number')
+    .eq('email', currentUserEmail);
+  completedDayNumbers = new Set((data || []).map(r => r.day_number));
+}
+
+function renderSidebar() {
+  const nav = document.getElementById('sidebar-nav');
+  const byPhase = {};
+  allDays.forEach(d => {
+    byPhase[d.phase] = byPhase[d.phase] || {};
+    byPhase[d.phase][d.week_number] = byPhase[d.phase][d.week_number] || [];
+    byPhase[d.phase][d.week_number].push(d);
+  });
+
+  let html = '';
+  Object.keys(byPhase).sort((a,b)=>a-b).forEach(phase => {
+    html += `<div class="phase-block"><div class="phase-title">Phase ${phase}</div>`;
+    const weeks = byPhase[phase];
+    Object.keys(weeks).sort((a,b)=>a-b).forEach(week => {
+      html += `<div class="week-title">Week ${week}</div>`;
+      weeks[week].forEach(d => {
+        const done = completedDayNumbers.has(d.day_number);
+        const isOptionalHere = currentTrack === 'fast' && d.track === 'standard_only';
+        const label = d.spans_label ? ` <span style="opacity:0.65; font-weight:400;">(${escapeHtml(d.spans_label)})</span>` : '';
+        const optBadge = isOptionalHere
+          ? ' <span style="font-size:10px; background:rgba(255,255,255,0.18); padding:1px 6px; border-radius:8px; margin-left:4px;">OPTIONAL</span>'
+          : '';
+        html += `<div class="day-item${isOptionalHere ? '' : ''}" data-day="${d.day_number}" style="${isOptionalHere ? 'opacity:0.6;' : ''}">
+          <span class="day-check ${done ? 'done' : ''}"></span>
+          <span>Session ${d.session_number} — ${escapeHtml(truncate(d.title, 30))}${label}${optBadge}</span>
+        </div>`;
+      });
+    });
+    html += `</div>`;
+  });
+  nav.innerHTML = html;
+
+  nav.querySelectorAll('.day-item').forEach(el => {
+    el.addEventListener('click', () => selectDay(parseInt(el.dataset.day, 10)));
+  });
+}
+
+function selectDay(dayNumber) {
+  currentDayNumber = dayNumber;
+  const day = allDays.find(d => d.day_number === dayNumber);
+  if (!day) return;
+
+  document.querySelectorAll('.day-item').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.day,10) === dayNumber);
+  });
+
+  const done = completedDayNumbers.has(dayNumber);
+  const main = document.getElementById('main-content');
+  const optionalNote = (currentTrack === 'fast' && day.track === 'standard_only')
+    ? `<div style="display:inline-block; margin-top:6px; padding:3px 10px; background:#FFF3E0; color:var(--amber); border-radius:10px; font-size:11px; font-weight:700;">OPTIONAL IN FAST TRACK — SKIP IF YOU'RE MOVING QUICKLY</div>`
+    : '';
+  main.innerHTML = `
+    <div class="day-header">
+      <div class="phase-week">Phase ${day.phase} · Week ${day.week_number}${day.spans_label ? ` · ${escapeHtml(day.spans_label)}` : ''}</div>
+      <h1>Session ${day.session_number} — ${escapeHtml(day.title)}</h1>
+      ${optionalNote}
+    </div>
+    <div class="content-body">${renderBodyMarkdown(day.body_markdown)}</div>
+    ${day.exit_standard ? `<div class="exit-standard"><div class="label">EXIT STANDARD</div><div>${escapeHtml(day.exit_standard)}</div></div>` : ''}
+    ${renderHandsOnBox(dayNumber)}
+    <div class="mark-complete-row">
+      <button id="complete-btn" class="${done ? 'done' : ''}">${done ? '✓ Marked Complete' : 'Mark Day Complete'}</button>
+      <span class="status" id="complete-status"></span>
+    </div>
+  `;
+  document.getElementById('complete-btn').addEventListener('click', () => markComplete(dayNumber));
+  main.scrollTop = 0;
+}
+
+async function markComplete(dayNumber) {
+  const btn = document.getElementById('complete-btn');
+  const status = document.getElementById('complete-status');
+  if (completedDayNumbers.has(dayNumber)) return;
+
+  btn.disabled = true;
+  const { error } = await sb.from('selfstudy_progress').insert({ email: currentUserEmail, day_number: dayNumber });
+  btn.disabled = false;
+
+  if (error) {
+    status.textContent = 'Could not save — try again.';
+    status.style.color = 'var(--red)';
+    return;
+  }
+  completedDayNumbers.add(dayNumber);
+  btn.textContent = '✓ Marked Complete';
+  btn.classList.add('done');
+  status.textContent = '';
+  renderSidebar();
+  document.querySelectorAll('.day-item').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.day,10) === dayNumber);
+  });
+}
+
+function renderHandsOnBox(dayNumber) {
+  const labs = labsByDay[dayNumber];
+  if (!labs || labs.length === 0) return '';
+
+  const items = labs.map(lab => {
+    const tplId = LAB_TO_TEMPLATE[lab.lab_id];
+    const tplBtn = tplId
+      ? `<button class="handson-btn" style="margin-left:6px; background:var(--teal);" onclick="jumpToTemplate('${tplId}')">📋 ${escapeHtml(TEMPLATE_NAMES[tplId])}</button>`
+      : '';
+    return `<div class="handson-item">
+      <div class="handson-text"><b>${escapeHtml(lab.lab_id)}</b> — ${escapeHtml(lab.title)}</div>
+      <div>
+        <button class="handson-btn" onclick="jumpToLab('${lab.lab_id}')">🧪 Open Lab</button>${tplBtn}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="handson-box">
+    <div class="handson-label">🔧 Hands-On For This Session — full steps live in Manual 2 / Manual 3</div>
+    ${items}
+  </div>`;
+}
+
+async function jumpToLab(labId) {
+  await showSection('labs');
+  const idx = contentCache.labs.findIndex(l => l.lab_id === labId);
+  if (idx >= 0) showSectionDetail('labs', idx);
+}
+
+async function jumpToTemplate(templateId) {
+  await showSection('templates');
+  const idx = contentCache.templates.findIndex(t => t.template_id === templateId);
+  if (idx >= 0) showSectionDetail('templates', idx);
+}
+
+async function showSection(section) {
+  currentDayNumber = null;
+  document.querySelectorAll('.day-item').forEach(el => el.classList.remove('active'));
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="loading">Loading…</div>`;
+
+  if (section === 'materials') {
+    renderMaterials();
+    return;
+  }
+  if (section === 'howto') {
+    renderHowToWorks();
+    return;
+  }
+
+  if (!contentCache[section]) {
+    const tableMap = {
+      labs: 'selfstudy_labs',
+      templates: 'selfstudy_templates',
+      case_studies: 'selfstudy_case_studies',
+      interview_rounds: 'selfstudy_interview_rounds',
+    };
+    const orderMap = { labs: 'lab_id', templates: 'template_id', case_studies: 'case_id', interview_rounds: 'round_number' };
+    const { data, error } = await sb.from(tableMap[section]).select('*').order(orderMap[section], { ascending: true });
+    if (error) {
+      main.innerHTML = `<div class="empty-state">Error loading: ${escapeHtml(error.message)}</div>`;
+      return;
+    }
+    contentCache[section] = data || [];
+  }
+
+  const items = contentCache[section];
+  const titleMap = { labs: 'Live SAP Labs', templates: 'Templates', case_studies: 'Case Study Library', interview_rounds: 'Interview Simulation' };
+  const libraryBanner = section === 'interview_rounds' ? `
+    <div class="handson-box" style="margin-top:0; margin-bottom:22px;">
+      <div class="handson-label">🎓 Job-Search Phase Resource</div>
+      <div class="handson-item" style="border-top:none;">
+        <div class="handson-text">The <b>Training Library</b> is a searchable reference of real findings and workpaper
+          examples — useful right now if an interviewer asks how you'd spot a specific kind of control failure.</div>
+        <a class="handson-btn" href="https://tib-training-library.vercel.app" target="_blank" rel="noopener">Open Library</a>
+      </div>
+    </div>` : '';
+  let html = `<div class="day-header"><h1>${titleMap[section]}</h1></div>${libraryBanner}<div id="section-list"></div><div id="section-detail"></div>`;
+  main.innerHTML = html;
+
+  const listEl = document.getElementById('section-list');
+  items.forEach((item, idx) => {
+    const title = item.title || item.name || `Round ${item.round_number}`;
+    const sub = item.objective || item.field_guide || item.track_flag || '';
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    div.innerHTML = `<div class="li-title">${escapeHtml(title)}</div><div class="li-sub">${escapeHtml(truncate(sub, 120))}</div>`;
+    div.addEventListener('click', () => showSectionDetail(section, idx));
+    listEl.appendChild(div);
+  });
+}
+
+function showSectionDetail(section, idx) {
+  const item = contentCache[section][idx];
+  const detailEl = document.getElementById('section-detail');
+  let bodyText = item.live_system_steps || item.filled_example || item.scenario_text || item.answer_framework || '';
+  detailEl.innerHTML = `<div style="margin-top:20px; border-top:2px solid var(--midgrey); padding-top:20px;">
+    <div class="content-body">${renderBodyMarkdown(bodyText)}</div>
+  </div>`;
+  detailEl.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderHowToWorks() {
+  const coreCount = allDays.filter(d => d.track === 'core').length;
+  const fullCount = allDays.length;
+  const main = document.getElementById('main-content');
+  main.innerHTML = `
+    <div class="day-header howto-page">
+      <h1>How This Course Works</h1>
+      <p style="color:#666; margin-top:8px; font-size:14px; max-width:640px;">
+        This programme is built from three manuals working together, not one — and it now runs as
+        <b>${fullCount} sessions</b>, not calendar days. Pick the pace that fits you at any time using the
+        track switcher at the bottom of the sidebar.
+      </p>
+
+      <div class="exit-standard" style="max-width:640px; margin-top:18px;">
+        <div class="label">BEFORE YOU START</div>
+        <p style="font-size:14px; line-height:1.6; margin:0;">
+          This hands-on programme pairs with the <b>No-Access Track</b> — a judgment-first course you complete
+          with no SAP system required. Most trainees finish that one first: it builds the analytical framework
+          that makes these live sessions click faster, since you already know what you're looking for before
+          you learn where to find it.
+          <a href="https://sap-controls-analyst-lms.vercel.app" target="_blank" rel="noopener"
+             style="color:var(--teal); font-weight:700; text-decoration:none;">Open the No-Access Track →</a>
+        </p>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card">
+          <div class="fc-num">⚡ Fast Track</div>
+          <h3>${coreCount} Sessions</h3>
+          <p>Every session with unique content, plus every lab, template, case study, and interview round.
+          Scheduled practice/consolidation checkpoints are shown but marked <b>Optional</b> — skip them if
+          you're confident and want to move straight through.</p>
+        </div>
+        <div class="flow-card">
+          <div class="fc-num">📚 Standard Track</div>
+          <h3>${fullCount} Sessions</h3>
+          <p>The full programme including built-in spaced-repetition checkpoints — dedicated sessions to
+          pause, re-read, and consolidate before moving on. Recommended if this is your first time through
+          SAP controls work.</p>
+        </div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card">
+          <div class="fc-num">Step 1</div>
+          <h3>📖 Read the Session</h3>
+          <p>Work through the lesson in the sidebar. Some sessions introduce a new concept; others are
+          marked "Practice" on purpose — no new reading, because the work that session is hands-on.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-card">
+          <div class="fc-num">Step 2</div>
+          <h3>🧪 Do the Lab</h3>
+          <p>When a session has a live exercise, an amber <b>"Hands-On For This Session"</b> box appears
+          right under the lesson. Click <b>Open Lab</b> — it jumps you straight to that lab's full
+          step-by-step instructions.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-card">
+          <div class="fc-num">Step 3</div>
+          <h3>📋 Fill the Template</h3>
+          <p>If the lab produces a real deliverable (an RCM, a deficiency memo, a sampling worksheet), a
+          second button jumps you to that template's field guide and a worked, filled-in example.</p>
+        </div>
+      </div>
+
+      <ul class="rule-list">
+        <li><b>A session is a unit of work, not a calendar day.</b> Multi-day blocks in the original manuals
+        (a 5-day capstone, a week of practicum) are now one session each, with the original day-range shown
+        for reference — no more re-reading identical text across several calendar entries.</li>
+        <li><b>Manual 2 (Live SAP Lab Workbook)</b> holds the full step-by-step lab instructions with
+        screenshots. The <b>Live SAP Labs</b> tab in the sidebar covers the same ground — use whichever you
+        prefer.</li>
+        <li><b>Manual 3 (Reference &amp; Templates)</b> is your working toolkit — the same field guides and
+        filled examples are also in the <b>Templates</b> tab.</li>
+        <li><b>Practice/consolidation sessions are optional in Fast Track, required in Standard Track.</b>
+        Switch tracks anytime from the sidebar — your progress carries over either way.</li>
+        <li><b>Course Materials</b> in the sidebar has the original PDFs/Word files if you'd rather read a
+        full manual start to finish, or search across it, instead of the session-by-session flow.</li>
+      </ul>
+
+      <div class="exit-standard" style="max-width:640px;">
+        <div class="label">AFTER YOU FINISH</div>
+        <p style="font-size:14px; line-height:1.6; margin:0;">
+          When you complete this programme, don't close the tab and stop there. The <b>Training Library</b>
+          is a searchable reference of real findings and workpaper examples — keep it open through your
+          job search and interview prep, so you can pull up a concrete example the moment you need one.
+          <a href="https://tib-training-library.vercel.app" target="_blank" rel="noopener"
+             style="color:var(--teal); font-weight:700; text-decoration:none;">Open the Training Library →</a>
+        </p>
+      </div>
+    </div>`;
+}
+
+function renderMaterials() {
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="day-header">
+      <h1>Course Materials</h1>
+      <p style="color:#666; margin-top:6px; font-size:14px;">
+        The original manuals as published — exact PDF/Word files, unmodified. The daily lessons in the sidebar are a
+        guided, re-formatted rendering of this same content with progress tracking; download these if you want the
+        full manual as-authored, with original layout, headers, and styled tables intact.
+      </p>
+    </div>
+    <div id="materials-list"></div>`;
+
+  const listEl = document.getElementById('materials-list');
+  COURSE_MATERIALS.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    const badge = m.badge
+      ? `<span style="display:inline-block; margin-left:8px; padding:2px 9px; font-size:11px; font-weight:700;
+           letter-spacing:0.3px; color:#fff; background:var(--amber); border-radius:10px; vertical-align:middle;">${escapeHtml(m.badge)}</span>`
+      : '';
+    div.innerHTML = `
+      <div class="li-title">${escapeHtml(m.title)}${badge}</div>
+      <div class="li-sub">${escapeHtml(m.desc)}</div>
+      <a href="${m.file}" target="_blank" rel="noopener"
+         style="display:inline-block; margin-top:10px; padding:7px 16px; background:var(--teal); color:#fff;
+           border-radius:6px; text-decoration:none; font-size:13px; font-weight:600;">⬇ Download / View</a>`;
+    listEl.appendChild(div);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function truncate(s, n) {
+  s = s || '';
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+function buildTableHtml(rows) {
+  let html = '<table>';
+  rows.forEach((r, i) => {
+    html += '<tr>';
+    r.forEach(cellText => { html += i === 0 ? `<th>${escapeHtml(cellText)}</th>` : `<td>${escapeHtml(cellText)}</td>`; });
+    html += '</tr>';
+  });
+  return html + '</table>';
+}
+
+function renderBodyMarkdown(md) {
+  const blocks = ContentParser.parseBodyMarkdown(md);
+  let html = '';
+  for (const block of blocks) {
+    switch (block.type) {
+      case 'callout':
+        html += `<div class="callout">${escapeHtml(block.text)}</div>`;
+        break;
+      case 'casestudy':
+        html += `<div class="case-title">${escapeHtml(block.text)}</div>`;
+        break;
+      case 'table':
+        html += buildTableHtml(block.rows);
+        break;
+      case 'bullets':
+        if (block.lead) html += `<p>${escapeHtml(block.lead)}</p>`;
+        html += '<ul>' + block.items.map(i => `<li>${escapeHtml(i)}</li>`).join('') + '</ul>';
+        break;
+      case 'weekphase':
+        html += `<p style="font-weight:700;color:var(--navy);border-bottom:2px solid var(--navy);padding-bottom:6px;">${escapeHtml(block.text)}</p>`;
+        break;
+      default:
+        html += `<p>${escapeHtml(block.text)}</p>`;
+    }
+  }
+  return html;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAP Controls Mastery — Cohort Dashboard (Staff)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --navy: #1F3864;
+    --teal: #1F7A8C;
+    --amber: #C65911;
+    --lightgrey: #F2F2F2;
+    --midgrey: #D9D9D9;
+    --dark: #222222;
+    --green: #2E7D32;
+    --red: #B02418;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Calibri, Roboto, sans-serif; background: #F7F9FB; color: var(--dark); }
+
+  #signin-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .signin-card { max-width: 420px; width: 100%; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(31,56,100,0.10); overflow: hidden; }
+  .signin-banner { background: var(--navy); padding: 24px 32px; }
+  .signin-banner .brand { color: #fff; font-weight: 700; font-size: 14px; letter-spacing: 0.5px; }
+  .signin-banner .tagline { color: #D9E4EF; font-size: 12px; margin-top: 4px; }
+  .signin-body { padding: 32px; }
+  .signin-body h1 { color: var(--navy); font-size: 22px; margin-bottom: 6px; }
+  .signin-body .sub { color: #666; font-size: 14px; margin-bottom: 22px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 5px; }
+  .field input { width: 100%; padding: 10px 12px; border: 1px solid var(--midgrey); border-radius: 6px; font-size: 14px; }
+  .field input:focus { outline: none; border-color: var(--teal); }
+  .btn-primary { width: 100%; padding: 11px; background: var(--navy); color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 6px; }
+  .btn-primary:hover { background: #16294a; }
+  .btn-primary:disabled { background: #9aa5b8; cursor: not-allowed; }
+  .error-msg { color: var(--red); font-size: 13px; margin-top: 10px; }
+
+  #dash-screen { display: none; }
+  .topbar { background: var(--navy); color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .topbar .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.5px; }
+  .topbar .product { color: var(--amber); font-weight: 700; font-size: 15px; margin-top: 2px; }
+  .topbar button { background: transparent; border: 1px solid #7C8CA8; color: #D9E4EF; padding: 6px 14px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+  .topbar button:hover { border-color: #fff; color: #fff; }
+
+  .main { padding: 28px 32px; max-width: 1280px; margin: 0 auto; }
+  .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-card { background: #fff; border: 1px solid var(--midgrey); border-radius: 8px; padding: 16px 20px; min-width: 150px; flex: 1; }
+  .stat-card .num { font-size: 26px; font-weight: 700; color: var(--navy); }
+  .stat-card .label { font-size: 12px; color: #777; margin-top: 2px; }
+  .stat-card.warn .num { color: var(--red); }
+
+  .controls { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .controls select, .controls input { padding: 8px 12px; border: 1px solid var(--midgrey); border-radius: 6px; font-size: 13px; }
+  .controls input[type="text"] { flex: 1; min-width: 200px; }
+  .controls .chip { padding: 6px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; border: 1px solid var(--midgrey); background: #fff; color: #666; }
+  .controls .chip.active { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+  th { background: var(--navy); color: #fff; text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; }
+  th:hover { background: #16294a; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--midgrey); font-size: 13px; vertical-align: middle; }
+  tr:nth-child(even) td { background: var(--lightgrey); }
+  .progress-bar-outer { width: 100px; height: 8px; background: var(--midgrey); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 8px; }
+  .progress-bar-inner { height: 100%; background: var(--teal); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge.active { background: #E3F2E5; color: var(--green); }
+  .badge.notstarted { background: #F2F2F2; color: #777; }
+  .badge.atrisk { background: #FBEAE8; color: var(--red); }
+  .badge.track { background: #E9F1F4; color: var(--navy); }
+  .badge.track.fast { background: #FBEBDD; color: var(--amber); }
+  .empty-state { padding: 60px 0; text-align: center; color: #999; }
+  .loading { padding: 60px 0; text-align: center; color: #999; }
+  .not-authorized { max-width: 480px; margin: 15vh auto; text-align: center; color: var(--red); padding: 24px; }
+</style>
+</head>
+<body>
+
+<div id="signin-screen">
+  <div class="signin-card">
+    <div class="signin-banner">
+      <div class="brand">TIB SYSTEMS LLC</div>
+      <div class="tagline">SAP Controls Mastery — Staff Cohort Dashboard</div>
+    </div>
+    <div class="signin-body">
+      <h1>Staff Sign In</h1>
+      <div class="sub">This dashboard is for TIB staff only — the same login as your normal TIB systems access, if you've been added as staff for this product.</div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="email-input" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="password-input" autocomplete="current-password" />
+      </div>
+      <button class="btn-primary" id="signin-btn">Sign In</button>
+      <div id="signin-error" class="error-msg" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="not-authorized-screen" style="display:none;">
+  <div class="not-authorized">
+    <h1 style="color:var(--navy); margin-bottom:10px;">Not Authorized</h1>
+    <p>This account isn't on the staff list for the cohort dashboard. If you should have access, ask an admin to add your email to the <code>staff_users</code> table.</p>
+    <button class="btn-primary" id="back-btn" style="max-width:200px; margin:20px auto 0;">Back to Sign In</button>
+  </div>
+</div>
+
+<div id="dash-screen">
+  <div class="topbar">
+    <div>
+      <div class="brand">TIB SYSTEMS LLC</div>
+      <div class="product">Cohort Dashboard — SAP Controls Mastery</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <span id="staff-email" style="font-size:12px; color:#D9E4EF;"></span>
+      <button id="signout-btn">Sign Out</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="stats-row" id="stats-row"></div>
+    <div class="controls">
+      <input type="text" id="search-input" placeholder="Search by email or payment reference…" />
+      <select id="tier-filter">
+        <option value="all">All tiers</option>
+        <option value="solo">Solo</option>
+        <option value="cohort">Cohort</option>
+      </select>
+      <select id="track-filter">
+        <option value="all">All tracks</option>
+        <option value="core">Fast Track</option>
+        <option value="standard">Standard Track</option>
+      </select>
+      <div class="chip" id="filter-notstarted">Not started</div>
+      <div class="chip" id="filter-atrisk">At risk (14+ days inactive)</div>
+    </div>
+    <div id="table-container"><div class="loading">Loading enrollments…</div></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://blfgwysgekfqhcafofhe.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsZmd3eXNnZWtmcWhjYWZvZmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyODY0NDksImV4cCI6MjA5NTg2MjQ0OX0.HPdIMd-X30QBufoL9BVSVte6s_Fc-OOKIq9MbwLrzcI";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Session counts by track — Fast Track = core-only sessions, Standard Track = core + optional practice sessions.
+// Kept in sync with selfstudy_days: total rows per track value.
+let SESSION_TOTALS = { core: 74, standard: 85 }; // fallback defaults; refreshed live in loadData()
+
+let rows = [];              // merged enrollment+progress rows
+let currentTierFilter = 'all';
+let currentTrackFilter = 'all';
+let currentQuickFilter = null; // 'notstarted' | 'atrisk' | null
+let sortKey = 'lastActivity';
+let sortDir = 'asc';
+
+// ---------------- Auth ----------------
+
+document.getElementById('signin-btn').addEventListener('click', signIn);
+document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+document.getElementById('back-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  document.getElementById('not-authorized-screen').style.display = 'none';
+  document.getElementById('signin-screen').style.display = 'flex';
+});
+document.getElementById('signout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  location.reload();
+});
+
+async function signIn() {
+  const email = document.getElementById('email-input').value.trim();
+  const password = document.getElementById('password-input').value;
+  const errEl = document.getElementById('signin-error');
+  errEl.style.display = 'none';
+
+  if (!email || !password) {
+    errEl.textContent = 'Enter your email and password.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('signin-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Sign In';
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  await checkStaffAndEnter(email);
+}
+
+async function checkStaffAndEnter(email) {
+  const { data: isStaff, error } = await sb.rpc('is_staff', { check_email: email });
+  if (error || !isStaff) {
+    document.getElementById('signin-screen').style.display = 'none';
+    document.getElementById('not-authorized-screen').style.display = 'block';
+    return;
+  }
+  document.getElementById('signin-screen').style.display = 'none';
+  document.getElementById('dash-screen').style.display = 'block';
+  document.getElementById('staff-email').textContent = email;
+  await loadData();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await checkStaffAndEnter(session.user.email);
+  }
+})();
+
+async function loadData() {
+  const [{ data: enrollments, error: enrollErr }, { data: progress, error: progErr }, { data: dayTracks }] = await Promise.all([
+    sb.from('selfstudy_enrollments').select('email, tier, payment_ref, created_at, preferred_track'),
+    sb.from('selfstudy_progress').select('email, day_number, completed_at'),
+    sb.from('selfstudy_days').select('day_number, track'),
+  ]);
+
+  if (enrollErr) {
+    document.getElementById('table-container').innerHTML = `<div class="empty-state">Error loading enrollments: ${escapeHtml(enrollErr.message)}</div>`;
+    return;
+  }
+
+  // Refresh live session totals from the actual curriculum table, rather than trusting hardcoded fallbacks.
+  if (dayTracks && dayTracks.length) {
+    const coreCount = dayTracks.length; // every row (core + standard_only) is visible on Standard Track
+    const fastCount = dayTracks.filter(d => d.track === 'core').length; // Fast Track sees core-only sessions
+    SESSION_TOTALS = { core: fastCount, standard: coreCount };
+  }
+
+  const progressByEmail = {};
+  (progress || []).forEach(p => {
+    if (!progressByEmail[p.email]) progressByEmail[p.email] = [];
+    progressByEmail[p.email].push(p);
+  });
+
+  const now = new Date();
+  rows = (enrollments || []).map(e => {
+    const prog = progressByEmail[e.email] || [];
+    const daysCompleted = prog.length;
+    const track = e.preferred_track === 'core' ? 'core' : 'standard'; // 'core' = Fast Track, 'standard' = Standard Track (default)
+    const trackTotal = SESSION_TOTALS[track] || SESSION_TOTALS.standard;
+    const lastActivity = prog.length
+      ? new Date(Math.max(...prog.map(p => new Date(p.completed_at).getTime())))
+      : null;
+    const daysSinceActivity = lastActivity ? Math.floor((now - lastActivity) / 86400000) : null;
+    let status = 'active';
+    if (daysCompleted === 0) status = 'notstarted';
+    else if (daysSinceActivity !== null && daysSinceActivity >= 14) status = 'atrisk';
+    return {
+      email: e.email, tier: e.tier, paymentRef: e.payment_ref, enrolledAt: e.created_at,
+      track, trackTotal, daysCompleted, lastActivity, daysSinceActivity, status,
+    };
+  });
+
+  renderStats();
+  renderTable();
+}
+
+function renderStats() {
+  const total = rows.length;
+  const notStarted = rows.filter(r => r.status === 'notstarted').length;
+  const atRisk = rows.filter(r => r.status === 'atrisk').length;
+  const active = total - notStarted - atRisk;
+  const avgDays = total ? (rows.reduce((s, r) => s + r.daysCompleted, 0) / total).toFixed(1) : '0';
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="num">${total}</div><div class="label">Total Enrolled</div></div>
+    <div class="stat-card"><div class="num">${active}</div><div class="label">Active</div></div>
+    <div class="stat-card"><div class="num">${notStarted}</div><div class="label">Not Started</div></div>
+    <div class="stat-card warn"><div class="num">${atRisk}</div><div class="label">At Risk (14+ days inactive)</div></div>
+    <div class="stat-card"><div class="num">${avgDays}</div><div class="label">Avg. Sessions Completed</div></div>
+  `;
+}
+
+function applyFiltersAndSort() {
+  const search = document.getElementById('search-input').value.trim().toLowerCase();
+  let filtered = rows.filter(r => {
+    if (currentTierFilter !== 'all' && r.tier !== currentTierFilter) return false;
+    if (currentTrackFilter !== 'all' && r.track !== currentTrackFilter) return false;
+    if (currentQuickFilter === 'notstarted' && r.status !== 'notstarted') return false;
+    if (currentQuickFilter === 'atrisk' && r.status !== 'atrisk') return false;
+    if (search) {
+      const hay = (r.email + ' ' + (r.paymentRef || '')).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    if (sortKey === 'lastActivity') { av = av ? av.getTime() : -1; bv = bv ? bv.getTime() : -1; }
+    if (typeof av === 'string') { av = av.toLowerCase(); bv = (bv || '').toLowerCase(); }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  return filtered;
+}
+
+function renderTable() {
+  const filtered = applyFiltersAndSort();
+  const container = document.getElementById('table-container');
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state">No learners match the current filters.</div>`;
+    return;
+  }
+
+  let html = `<table><thead><tr>
+    <th data-sort="email">Email</th>
+    <th data-sort="tier">Tier</th>
+    <th data-sort="track">Track</th>
+    <th data-sort="paymentRef">Payment Ref</th>
+    <th data-sort="enrolledAt">Enrolled</th>
+    <th data-sort="daysCompleted">Progress</th>
+    <th data-sort="lastActivity">Last Activity</th>
+    <th data-sort="status">Status</th>
+  </tr></thead><tbody>`;
+
+  filtered.forEach(r => {
+    const pct = Math.round((r.daysCompleted / r.trackTotal) * 100);
+    const lastActStr = r.lastActivity ? r.lastActivity.toISOString().slice(0, 10) + ` (${r.daysSinceActivity}d ago)` : '—';
+    const enrolledStr = r.enrolledAt ? new Date(r.enrolledAt).toISOString().slice(0, 10) : '—';
+    const badgeClass = r.status === 'active' ? 'active' : r.status === 'atrisk' ? 'atrisk' : 'notstarted';
+    const badgeLabel = r.status === 'active' ? 'Active' : r.status === 'atrisk' ? 'At Risk' : 'Not Started';
+    const trackClass = r.track === 'core' ? 'track fast' : 'track';
+    const trackLabel = r.track === 'core' ? 'Fast' : 'Standard';
+    html += `<tr>
+      <td>${escapeHtml(r.email)}</td>
+      <td>${escapeHtml(r.tier)}</td>
+      <td><span class="badge ${trackClass}">${trackLabel}</span></td>
+      <td>${escapeHtml(r.paymentRef || '—')}</td>
+      <td>${enrolledStr}</td>
+      <td><span class="progress-bar-outer"><span class="progress-bar-inner" style="width:${pct}%"></span></span>${r.daysCompleted}/${r.trackTotal}</td>
+      <td>${lastActStr}</td>
+      <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+
+  container.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortKey = key; sortDir = 'asc'; }
+      renderTable();
+    });
+  });
+}
+
+document.getElementById('search-input').addEventListener('input', renderTable);
+document.getElementById('tier-filter').addEventListener('change', (e) => { currentTierFilter = e.target.value; renderTable(); });
+document.getElementById('track-filter').addEventListener('change', (e) => { currentTrackFilter = e.target.value; renderTable(); });
+document.getElementById('filter-notstarted').addEventListener('click', (e) => {
+  currentQuickFilter = currentQuickFilter === 'notstarted' ? null : 'notstarted';
+  document.getElementById('filter-notstarted').classList.toggle('active', currentQuickFilter === 'notstarted');
+  document.getElementById('filter-atrisk').classList.remove('active');
+  renderTable();
+});
+document.getElementById('filter-atrisk').addEventListener('click', (e) => {
+  currentQuickFilter = currentQuickFilter === 'atrisk' ? null : 'atrisk';
+  document.getElementById('filter-atrisk').classList.toggle('active', currentQuickFilter === 'atrisk');
+  document.getElementById('filter-notstarted').classList.remove('active');
+  renderTable();
+});
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
